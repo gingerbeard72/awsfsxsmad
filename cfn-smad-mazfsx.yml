@@ -1,0 +1,143 @@
+---
+AWSTemplateFormatVersion: 2010-09-09
+
+Description: Creates an FSx File system connect to a Self Managed Microsoft Active Directory
+
+Metadata:
+  Authors:
+    Description: mark iveli
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+    - Label:
+        default: Directory
+  Parameters:
+  
+  - Label:
+        default: Windows Configuration
+        Parameters:
+          - domainName
+          - netBiosName
+          - commonPassword
+          - SecurityGroups
+          - Preferredsubnet
+          - standbysubnet
+          - DNSservers
+          - ServiceAccount
+          - StorageCapacity
+          - DeploymentType
+
+Parameters:
+  DepType:
+    Description: The type of FSx to create, Single AZ or Multi AZ
+    Type: String
+    Default: "SINGLE_AZ_2"
+    AllowedValues: ["MULTI_AZ_1", "SINGLE_AZ_1", "SINGLE_AZ_2"]
+  DomainName:
+    Default: "Gingerbeard.sng"
+    Type: String
+  NetBiosName:
+    Default: "Gingerbeard"
+    Type: String
+  FSxAdmin:
+    Default: "Administrator"
+    Type: String
+  CommonPassword:
+    AllowedPattern: (?=^.{6,255}$)((?=.*\d)(?=.*[A-Z])(?=.*[a-z])|(?=.*\d)(?=.*[^A-Za-z0-9])(?=.*[a-z])|(?=.*[^A-Za-z0-9])(?=.*[A-Z])(?=.*[a-z])|(?=.*\d)(?=.*[A-Z])(?=.*[^A-Za-z0-9]))^.*
+    Description: Password for the domain Administrator user. MUST be at least 8 characters
+      containing AT LEAST ONE letter, number and symbol
+    MaxLength: '32'
+    MinLength: '8'
+    NoEcho: 'true'
+    Type: String
+  SecurityGroupId:
+    Description: Select an existing security group id
+    Type: AWS::EC2::SecurityGroup::Id          
+  StorageCapacity:
+    Default: 300
+    Description: Storage capacity (GiB)
+    MaxValue: 64000
+    MinValue: 300
+    Type: Number
+  StorageType:
+    Description: the type of storage to be used
+    Type: String
+    Default: SSD
+    AllowedValues: ["SSD","HDD"]
+  PreferredSubnetId:
+    Description: Select an existing subnet id
+    Type: AWS::EC2::Subnet::Id
+  SubnetIds:
+    Description: Select an existing subnet id
+    Type: AWS::EC2::Subnet::Id
+  ThroughputCapacity:
+    AllowedValues:
+    - 8
+    - 16
+    - 32
+    - 64
+    - 128
+    - 256
+    - 512
+    - 1024
+    - 2048
+    Default: 8
+    Description: Throughput capacity (MiB/s)
+    Type: String
+  WeeklyMaintenanceStartTime:
+    AllowedPattern: ^$|[1-7]:([01]\d|2[0-3]):?([0-5]\d)$
+    Description: Enter the weekly maintenance start time in day:hour:minute UTC format (e.g. Monday 11:30pm = 1:23:30)
+    Type: String
+  FileSystemName:
+    AllowedPattern: ^$|(.*)$
+    Description: Name of file system - name value of key-value pair
+    Type: String
+  DNSIP1:
+    Description: Ip address of Self Managed AD DNS server 1
+    Type: String
+  DNSIP2:
+    Description: Ip address of Self Managed AD DNS server 2
+    Type: String
+
+
+
+Resources:
+  WindowsSelfManagedADFileSystemWithAllConfigs:
+    Type: 'AWS::FSx::FileSystem'
+    Properties:
+      FileSystemType: WINDOWS
+      StorageCapacity:
+        "Ref": "StorageCapacity"
+      StorageType: 
+        "Ref": "StorageType"
+      SecurityGroupIds: [
+        "Ref": "SecurityGroupId"
+      ]
+      SubnetIds: 
+        "Ref": "SubnetIds"
+
+      Tags:
+        - Key: Name
+          Value: windows-fsx
+      WindowsConfiguration:
+        ThroughputCapacity: 
+          "Ref": "ThroughputCapacity"
+        WeeklyMaintenanceStartTime: '4:16:30'
+        DailyAutomaticBackupStartTime: '01:00'
+        AutomaticBackupRetentionDays: 2
+        CopyTagsToBackups: false
+        DeploymentType: 
+          "Ref": "DepType"
+        SelfManagedActiveDirectoryConfiguration:
+          DnsIps: [
+            "Ref": "DNSIP1", "DNSIP2"
+          ]
+          DomainName:
+            "Ref": DomainName
+          FileSystemAdministratorsGroup: 'Domain Admins'
+          OrganizationalUnitDistinguishedName: 'OU=FSx,DC=corp,DC=example,DC=com'
+          UserName:
+            "Ref": "FSxAdmin"
+          Password:
+            "Ref": "CommonPassword"
+          PreferredSubnetId: 
+            "Ref": "PreferredSubnetId"
